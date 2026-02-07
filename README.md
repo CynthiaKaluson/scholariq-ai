@@ -1,0 +1,1 @@
+# scholariq-ai
