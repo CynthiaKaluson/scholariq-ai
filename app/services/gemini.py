@@ -1,4 +1,5 @@
-import google.generativeai as genai
+from google.generativeai import GenerativeModel, configure
+from google.generativeai.types import GenerationConfig
 
 from app.core.config import settings
 from app.models.schemas import OutlineRequest, ChapterRequest
@@ -8,11 +9,9 @@ from app.models.schemas import OutlineRequest, ChapterRequest
 # GEMINI CLIENT SETUP
 # =========================
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
+configure(api_key=settings.GEMINI_API_KEY)
 
-model = genai.GenerativeModel(
-    model_name="models/gemini-1.5-pro"
-)
+model = GenerativeModel(model_name="models/gemini-1.5-pro")
 
 
 # =========================
@@ -20,43 +19,92 @@ model = genai.GenerativeModel(
 # =========================
 
 def category_intelligence(category: str) -> str:
-    """
-    Controls tone, reasoning style, and structure per category.
-    """
-
     mapping = {
         "academic": (
             "Use formal academic language.\n"
-            "Follow scholarly structure and depth.\n"
-            "Support arguments with peer-reviewed citations.\n"
+            "Apply scholarly structure and analytical depth.\n"
+            "Ground arguments in credible academic sources.\n"
         ),
         "professional": (
-            "Write clearly and concisely.\n"
-            "Focus on applied knowledge and clarity.\n"
+            "Write clearly and directly.\n"
+            "Prioritize usefulness and clarity.\n"
         ),
         "business": (
-            "Write for executives and decision-makers.\n"
-            "Emphasize strategy, metrics, and outcomes.\n"
+            "Write for decision-makers.\n"
+            "Focus on strategy, performance, and outcomes.\n"
         ),
         "content_marketing": (
-            "Write engaging, reader-focused content.\n"
-            "Use persuasive and storytelling techniques.\n"
+            "Write engaging and reader-focused content.\n"
+            "Maintain flow and persuasive clarity.\n"
         ),
         "personal_admin": (
-            "Write politely, clearly, and professionally.\n"
-            "Keep structure simple and direct.\n"
+            "Write politely and professionally.\n"
+            "Use simple and respectful language.\n"
         ),
         "technical": (
             "Write with precision and accuracy.\n"
-            "Use structured explanations and definitions.\n"
+            "Explain concepts systematically.\n"
         ),
         "specialized": (
-            "Write with domain-specific rigor.\n"
-            "Follow industry or regulatory standards.\n"
+            "Follow domain-specific standards.\n"
+            "Use precise professional terminology.\n"
         ),
     }
 
     return mapping.get(category, "")
+
+
+# =========================
+# WRITING-TYPE INTELLIGENCE
+# =========================
+
+def writing_type_intelligence(writing_type: str) -> str:
+    wt = writing_type.lower()
+
+    mapping = {
+        "research paper": (
+            "Structure content with abstract, methodology, results, and discussion.\n"
+            "Emphasize evidence-based reasoning and citations.\n"
+        ),
+        "literature review": (
+            "Synthesize existing studies.\n"
+            "Compare findings and identify gaps.\n"
+        ),
+        "thesis": (
+            "Maintain formal academic rigor.\n"
+            "Develop arguments progressively across sections.\n"
+        ),
+        "business plan": (
+            "Focus on execution strategy, market opportunity, and financial logic.\n"
+            "Write persuasively but realistically.\n"
+        ),
+        "market research report": (
+            "Present structured analysis and insights.\n"
+            "Interpret trends and data clearly.\n"
+        ),
+        "blog post": (
+            "Use conversational tone.\n"
+            "Maintain reader engagement and clarity.\n"
+        ),
+        "email": (
+            "Be concise and action-oriented.\n"
+            "Avoid unnecessary elaboration.\n"
+        ),
+        "copywriting": (
+            "Write persuasively with clear value propositions.\n"
+            "Guide the reader toward action.\n"
+        ),
+        "ghostwriting": (
+            "Adapt to a neutral professional voice.\n"
+            "Avoid personal identifiers or stylistic bias.\n"
+        ),
+        "technical documentation": (
+            "Explain systems and processes step by step.\n"
+            "Use structured formatting and definitions.\n"
+        ),
+    }
+
+    return mapping.get(wt, "")
 
 
 # =========================
@@ -65,11 +113,12 @@ def category_intelligence(category: str) -> str:
 
 def build_outline_prompt(data: OutlineRequest) -> str:
     category_rules = category_intelligence(data.category)
+    writing_type_rules = writing_type_intelligence(data.writing_type)
 
     citation_rule = (
         "Use references from the last 5 years only.\n"
         if not data.allow_old_citations
-        else "Older references are allowed if relevant.\n"
+        else "Older references may be used if relevant.\n"
     )
 
     education_context = (
@@ -83,21 +132,23 @@ def build_outline_prompt(data: OutlineRequest) -> str:
         f"Writing type: {data.writing_type}\n"
         f"Citation style: {data.citation_style}\n"
         f"{category_rules}"
+        f"{writing_type_rules}"
         f"{citation_rule}"
         f"{education_context}"
         f"Topic: {data.topic}\n"
-        "Generate a clear, logical outline with chapters and sub-sections.\n"
+        "Generate a structured outline with chapters and sub-sections.\n"
         "Return only the outline.\n"
     )
 
 
 def build_chapter_prompt(data: ChapterRequest) -> str:
     category_rules = category_intelligence(data.category)
+    writing_type_rules = writing_type_intelligence(data.writing_type)
 
     citation_rule = (
         "Use references from the last 5 years only.\n"
         if not data.allow_old_citations
-        else "Older references are allowed if relevant.\n"
+        else "Older references may be used if relevant.\n"
     )
 
     outline_block = "\n".join(f"- {point}" for point in data.outline_points)
@@ -108,8 +159,9 @@ def build_chapter_prompt(data: ChapterRequest) -> str:
         f"Chapter title: {data.chapter_title}\n"
         f"Citation style: {data.citation_style}\n"
         f"{category_rules}"
+        f"{writing_type_rules}"
         f"{citation_rule}"
-        f"Write approximately {data.word_count} words.\n"
+        f"Target length: {data.word_count} words.\n"
         "Follow the outline strictly.\n"
         "Outline points:\n"
         f"{outline_block}\n"
@@ -124,7 +176,7 @@ def build_chapter_prompt(data: ChapterRequest) -> str:
 def generate_outline(data: OutlineRequest) -> str:
     response = model.generate_content(
         build_outline_prompt(data),
-        generation_config=genai.types.GenerationConfig(
+        generation_config=GenerationConfig(
             temperature=0.4,
             max_output_tokens=2048,
         ),
@@ -135,7 +187,7 @@ def generate_outline(data: OutlineRequest) -> str:
 def generate_chapter(data: ChapterRequest) -> str:
     response = model.generate_content(
         build_chapter_prompt(data),
-        generation_config=genai.types.GenerationConfig(
+        generation_config=GenerationConfig(
             temperature=0.5,
             max_output_tokens=8192,
         ),
