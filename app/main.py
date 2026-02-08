@@ -1,18 +1,21 @@
 from fastapi import FastAPI
-from app.api.routes import router as api_router
-from app.routes import writing
 
+from app.core.config import settings
+from app.routes import router as api_router
+from app.api.writing import router as writing_router
 
 app = FastAPI(
-    title="Scholariq-AI",
-    description="Hybrid academic and professional knowledge synthesis platform",
+    title=settings.app_name,
     version="0.1.0",
+    description="Hybrid academic and professional knowledge synthesis platform",
 )
 
-app.include_router(api_router)
-app.include_router(writing.router)
-
+app.include_router(api_router, prefix="/api")
+app.include_router(writing_router)
 
 @app.get("/")
-async def root():
-    return {"message": "Scholariq-AI backend is running"}
+def root():
+    return {
+        "service": settings.app_name,
+        "status": "running",
+    }

@@ -11,7 +11,9 @@ from app.models.schemas import OutlineRequest, ChapterRequest
 
 configure(api_key=settings.GEMINI_API_KEY)
 
-model = GenerativeModel(model_name="models/gemini-1.5-pro")
+model = GenerativeModel(
+    model_name="models/gemini-3-pro-preview"
+)
 
 
 # =========================
@@ -95,8 +97,8 @@ def writing_type_intelligence(writing_type: str) -> str:
             "Guide the reader toward action.\n"
         ),
         "ghostwriting": (
-            "Adapt to a neutral professional voice.\n"
-            "Avoid personal identifiers or stylistic bias.\n"
+            "Adopt a neutral, professional voice.\n"
+            "Avoid identifiable stylistic fingerprints.\n"
         ),
         "technical documentation": (
             "Explain systems and processes step by step.\n"
@@ -108,64 +110,68 @@ def writing_type_intelligence(writing_type: str) -> str:
 
 
 # =========================
+# LONG-FORM INTELLIGENCE
+# =========================
+
+def long_form_intelligence(mode: str) -> str:
+    mapping = {
+        "single": (
+            "Produce a complete standalone work.\n"
+            "Ensure internal coherence.\n"
+        ),
+        "chapters": (
+            "This is part of a multi-chapter work.\n"
+            "Do not conclude the entire work.\n"
+            "Maintain continuity for subsequent chapters.\n"
+        ),
+        "series": (
+            "This content is part of a series.\n"
+            "Avoid final conclusions.\n"
+            "Create anticipation for the next part.\n"
+        ),
+    }
+
+    return mapping.get(mode, "")
+
+
+# =========================
 # PROMPT BUILDERS
 # =========================
 
 def build_outline_prompt(data: OutlineRequest) -> str:
-    category_rules = category_intelligence(data.category)
-    writing_type_rules = writing_type_intelligence(data.writing_type)
-
-    citation_rule = (
-        "Use references from the last 5 years only.\n"
-        if not data.allow_old_citations
-        else "Older references may be used if relevant.\n"
-    )
-
-    education_context = (
-        f"Education level: {data.education_level}\n"
-        if data.education_level
-        else ""
-    )
-
     return (
-        f"Writing category: {data.category}\n"
+        f"Writing category: {data.category.value}\n"
         f"Writing type: {data.writing_type}\n"
+        f"Long-form mode: {data.long_form_mode.value}\n"
         f"Citation style: {data.citation_style}\n"
-        f"{category_rules}"
-        f"{writing_type_rules}"
-        f"{citation_rule}"
-        f"{education_context}"
+        f"{category_intelligence(data.category.value)}"
+        f"{writing_type_intelligence(data.writing_type)}"
+        f"{long_form_intelligence(data.long_form_mode.value)}"
+        f"{'Use references from the last 5 years only.\n' if not data.allow_old_citations else ''}"
+        f"{f'Education level: {data.education_level}\n' if data.education_level else ''}"
         f"Topic: {data.topic}\n"
-        "Generate a structured outline with chapters and sub-sections.\n"
+        "Generate a structured outline.\n"
         "Return only the outline.\n"
     )
 
 
 def build_chapter_prompt(data: ChapterRequest) -> str:
-    category_rules = category_intelligence(data.category)
-    writing_type_rules = writing_type_intelligence(data.writing_type)
-
-    citation_rule = (
-        "Use references from the last 5 years only.\n"
-        if not data.allow_old_citations
-        else "Older references may be used if relevant.\n"
-    )
-
-    outline_block = "\n".join(f"- {point}" for point in data.outline_points)
+    outline_block = "\n".join(f"- {p}" for p in data.outline_points)
 
     return (
-        f"Writing category: {data.category}\n"
+        f"Writing category: {data.category.value}\n"
         f"Writing type: {data.writing_type}\n"
+        f"Long-form mode: {data.long_form_mode.value}\n"
         f"Chapter title: {data.chapter_title}\n"
         f"Citation style: {data.citation_style}\n"
-        f"{category_rules}"
-        f"{writing_type_rules}"
-        f"{citation_rule}"
+        f"{category_intelligence(data.category.value)}"
+        f"{writing_type_intelligence(data.writing_type)}"
+        f"{long_form_intelligence(data.long_form_mode.value)}"
+        f"{'Use references from the last 5 years only.\n' if not data.allow_old_citations else ''}"
         f"Target length: {data.word_count} words.\n"
-        "Follow the outline strictly.\n"
         "Outline points:\n"
         f"{outline_block}\n"
-        "Ensure logical flow and proper citations.\n"
+        "Do not summarize the entire work.\n"
     )
 
 
@@ -173,23 +179,25 @@ def build_chapter_prompt(data: ChapterRequest) -> str:
 # GENERATION FUNCTIONS
 # =========================
 
+def _safe_generate(prompt: str, config: GenerationConfig) -> str:
+    try:
+        response = model.generate_content(prompt, generation_config=config)
+        if not response or not response.text:
+            raise RuntimeError("Empty response from Gemini")
+        return response.text
+    except Exception as e:
+        raise RuntimeError(f"Gemini generation failed: {e}")
+
+
 def generate_outline(data: OutlineRequest) -> str:
-    response = model.generate_content(
+    return _safe_generate(
         build_outline_prompt(data),
-        generation_config=GenerationConfig(
-            temperature=0.4,
-            max_output_tokens=2048,
-        ),
+        GenerationConfig(temperature=0.4, max_output_tokens=4096),
     )
-    return response.text
 
 
 def generate_chapter(data: ChapterRequest) -> str:
-    response = model.generate_content(
+    return _safe_generate(
         build_chapter_prompt(data),
-        generation_config=GenerationConfig(
-            temperature=0.5,
-            max_output_tokens=8192,
-        ),
+        GenerationConfig(temperature=0.5, max_output_tokens=16384),
     )
-    return response.text

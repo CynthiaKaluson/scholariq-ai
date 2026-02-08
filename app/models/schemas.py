@@ -1,11 +1,7 @@
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-
-# =========================
-# ENUMS
-# =========================
 
 class WritingCategory(str, Enum):
     academic = "academic"
@@ -25,25 +21,29 @@ class CitationStyle(str, Enum):
     vancouver = "Vancouver"
 
 
-# =========================
-# REQUEST SCHEMAS
-# =========================
+class LongFormMode(str, Enum):
+    single = "single"
+    chapters = "chapters"
+    series = "series"
+
 
 class OutlineRequest(BaseModel):
-    topic: str
+    topic: str = Field(..., min_length=1)
     category: WritingCategory
-    writing_type: str  # e.g. "Research Paper", "Business Plan"
-    citation_style: Optional[CitationStyle] = None
+    writing_type: str = Field(..., min_length=1)
+    citation_style: Optional[CitationStyle] = CitationStyle.apa
     education_level: Optional[str] = None
+    long_form_mode: LongFormMode = LongFormMode.single
     allow_old_citations: bool = False
 
 
 class ChapterRequest(BaseModel):
-    topic: str
+    topic: str = Field(..., min_length=1)
     category: WritingCategory
-    writing_type: str
-    chapter_title: str
-    outline_points: List[str]
-    citation_style: Optional[CitationStyle] = None
-    word_count: int = 5000
+    writing_type: str = Field(..., min_length=1)
+    chapter_title: str = Field(..., min_length=1)
+    outline_points: List[str] = Field(..., min_items=1)
+    citation_style: Optional[CitationStyle] = CitationStyle.apa
+    word_count: int = Field(default=5000, ge=300)
+    long_form_mode: LongFormMode = LongFormMode.chapters
     allow_old_citations: bool = False
