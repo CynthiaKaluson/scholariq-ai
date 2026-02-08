@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from app.api.routes import router as api_router
+from app.routes import writing
+
 
 app = FastAPI(
     title="Scholariq-AI",
@@ -8,6 +10,7 @@ app = FastAPI(
 )
 
 app.include_router(api_router)
+app.include_router(writing.router)
 
 
 @app.get("/")
