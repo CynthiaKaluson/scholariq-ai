@@ -1,0 +1,9 @@
+{
+  "status": "success",
+  "outline": "I. INTRODUCTION\n   A. Background on AI in Healthcare\n      1. Evolution of AI applications\n      2. Current market penetration\n   B. Research Questions\n      1. How effective are AI systems?\n      2. What barriers exist?\n\nII. CURRENT APPLICATIONS\n   A. Diagnostic Systems\n      1. Image recognition for pathology (Smith & Johnson, 2023)\n      2. ECG analysis (Lee, 2024)\n   B. Treatment Planning\n      1. Personalized medicine protocols\n      2. Drug discovery acceleration\n\nIII. CHALLENGES & LIMITATIONS\n   A. Data Quality Issues\n   B. Regulatory Framework\n   C. Integration with Existing Systems\n\nIV. FUTURE OUTLOOK\n   A. Emerging Technologies\n   B. Market Projections\n   C. Ethical Considerations",
+  "citation_report": {
+    "total_citations": 2,
+    "valid_citations": 2,
+    "hallucination_score": 0.0
+  }
+}
