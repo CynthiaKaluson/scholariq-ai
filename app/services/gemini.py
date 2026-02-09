@@ -1,8 +1,10 @@
+# noinspection PyTypeChecker
 from google.generativeai import GenerativeModel, configure
 from google.generativeai.types import GenerationConfig
 
 from app.core.config import settings
 from app.models.schemas import OutlineRequest, ChapterRequest
+from app.services.citation_validator import validate_citations
 
 
 # =========================
@@ -22,6 +24,7 @@ model = GenerativeModel(
 # =========================
 
 def category_intelligence(category: str) -> str:
+    """Return category-specific writing guidelines."""
     return {
         "academic": (
             "Use formal academic language.\n"
@@ -52,6 +55,7 @@ def category_intelligence(category: str) -> str:
 
 
 def writing_type_intelligence(writing_type: str) -> str:
+    """Return writing-type-specific structure guidelines."""
     return {
         "research paper": (
             "Include abstract, methodology, results, and discussion.\n"
@@ -71,25 +75,34 @@ def writing_type_intelligence(writing_type: str) -> str:
         "email": (
             "Be concise and action-oriented.\n"
         ),
+        "thesis": (
+            "Follow academic thesis structure with chapters.\n"
+        ),
+        "technical documentation": (
+            "Use clear sections, examples, and precise language.\n"
+        ),
     }.get(writing_type.lower(), "")
 
 
 def long_form_intelligence(mode: str) -> str:
+    """Return long-form mode guidelines."""
     return {
         "single": "Produce a complete standalone work.\n",
         "chapters": (
             "This is part of a multi-chapter work.\n"
             "Do not conclude the entire work.\n"
+            "Prepare for continuation in next chapters.\n"
         ),
         "series": (
             "This is part of a series.\n"
             "Avoid final conclusions.\n"
+            "Leave room for follow-up content.\n"
         ),
     }.get(mode, "")
 
 
 # =========================
-# CITATION ENFORCEMENT (NEW - PHASE 1)
+# CITATION ENFORCEMENT (PHASE 1)
 # =========================
 
 def citation_intelligence(style: str, allow_old: bool) -> str:
@@ -138,6 +151,7 @@ def citation_intelligence(style: str, allow_old: bool) -> str:
 # =========================
 
 def build_outline_prompt(data: OutlineRequest) -> str:
+    """Build complete outline generation prompt."""
     return (
         f"Writing category: {data.category.value}\n"
         f"Writing type: {data.writing_type}\n"
@@ -157,6 +171,7 @@ def build_outline_prompt(data: OutlineRequest) -> str:
 
 
 def build_chapter_prompt(data: ChapterRequest) -> str:
+    """Build complete chapter generation prompt."""
     outline_block = "\n".join(f"- {p}" for p in data.outline_points)
 
     return (
@@ -181,26 +196,76 @@ def build_chapter_prompt(data: ChapterRequest) -> str:
 
 
 # =========================
-# GENERATION
+# GENERATION WITH VALIDATION
 # =========================
 
 def generate_outline(data: OutlineRequest) -> str:
-    response = model.generate_content(
-        build_outline_prompt(data),
-        generation_config=GenerationConfig(
-            temperature=0.3,  # Lower = more consistent structure
-            max_output_tokens=4096,
-        ),
-    )
-    return response.text
+    """Generate outline and validate citations."""
+    try:
+        response = model.generate_content(
+            build_outline_prompt(data),
+            generation_config=GenerationConfig(
+                temperature=0.3,
+                max_output_tokens=4096,
+            ),
+        )
+        outline_text = response.text
+
+        # Validate citations in outline
+        report = validate_citations(
+            outline_text,
+            data.citation_style.value,
+            data.allow_old_citations
+        )
+
+        # If high hallucination risk, warn user
+        if report.hallucination_score > 0.5:
+            outline_text += (
+                f"\n\n⚠️ HIGH HALLUCINATION RISK in citations "
+                f"({report.hallucination_score:.0%}). "
+                f"Review references carefully.\n"
+            )
+
+        return outline_text
+    except Exception as e:
+        return f"ERROR generating outline: {str(e)}"
 
 
 def generate_chapter(data: ChapterRequest) -> str:
-    response = model.generate_content(
-        build_chapter_prompt(data),
-        generation_config=GenerationConfig(
-            temperature=0.4,  # Slightly lower for academic credibility
-            max_output_tokens=16384,
-        ),
-    )
-    return response.text
+    """Generate chapter and validate citations."""
+    try:
+        response = model.generate_content(
+            build_chapter_prompt(data),
+            generation_config=GenerationConfig(
+                temperature=0.4,
+                max_output_tokens=16384,
+            ),
+        )
+        chapter_text = response.text
+
+        # Validate citations in chapter
+        report = validate_citations(
+            chapter_text,
+            data.citation_style.value,
+            data.allow_old_citations
+        )
+
+        # Append validation report to output
+        if report.suspicious_citations > 0:
+            chapter_text += (
+                f"\n\n📋 CITATION VALIDATION REPORT\n"
+                f"Total Citations: {report.total_citations}\n"
+                f"Valid: {report.valid_citations}\n"
+                f"Suspicious: {report.suspicious_citations}\n"
+                f"Hallucination Score: {report.hallucination_score:.0%}\n"
+            )
+
+            if report.issues:
+                chapter_text += "Issues:\n" + "\n".join(f"  • {issue}" for issue in report.issues) + "\n"
+
+            if report.recommendations:
+                chapter_text += "Recommendations:\n" + "\n".join(f"  • {rec}" for rec in report.recommendations) + "\n"
+
+        return chapter_text
+    except Exception as e:
+        return f"ERROR generating chapter: {str(e)}"
