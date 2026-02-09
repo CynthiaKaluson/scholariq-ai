@@ -15,7 +15,7 @@ configure(api_key=settings.GEMINI_API_KEY)
 
 # ✅ CORRECT: Just the model name
 model = GenerativeModel(
-    model_name="gemini-3-pro-preview"
+    model_name="gemini-3-flash-preview"
 )
 
 
