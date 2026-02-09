@@ -11,17 +11,18 @@ from app.models.schemas import OutlineRequest, ChapterRequest
 
 configure(api_key=settings.GEMINI_API_KEY)
 
+# ✅ CORRECT: Just the model name
 model = GenerativeModel(
-    model_name="models/gemini-3-pro-preview"
+    model_name="gemini-3-pro-preview"
 )
 
 
 # =========================
-# CATEGORY INTELLIGENCE
+# INTELLIGENCE LAYERS
 # =========================
 
 def category_intelligence(category: str) -> str:
-    mapping = {
+    return {
         "academic": (
             "Use formal academic language.\n"
             "Apply scholarly structure and analytical depth.\n"
@@ -37,101 +38,99 @@ def category_intelligence(category: str) -> str:
         ),
         "content_marketing": (
             "Write engaging and reader-focused content.\n"
-            "Maintain flow and persuasive clarity.\n"
         ),
         "personal_admin": (
             "Write politely and professionally.\n"
-            "Use simple and respectful language.\n"
         ),
         "technical": (
             "Write with precision and accuracy.\n"
-            "Explain concepts systematically.\n"
         ),
         "specialized": (
             "Follow domain-specific standards.\n"
-            "Use precise professional terminology.\n"
         ),
-    }
+    }.get(category, "")
 
-    return mapping.get(category, "")
-
-
-# =========================
-# WRITING-TYPE INTELLIGENCE
-# =========================
 
 def writing_type_intelligence(writing_type: str) -> str:
-    wt = writing_type.lower()
-
-    mapping = {
+    return {
         "research paper": (
-            "Structure content with abstract, methodology, results, and discussion.\n"
-            "Emphasize evidence-based reasoning and citations.\n"
+            "Include abstract, methodology, results, and discussion.\n"
         ),
         "literature review": (
-            "Synthesize existing studies.\n"
-            "Compare findings and identify gaps.\n"
-        ),
-        "thesis": (
-            "Maintain formal academic rigor.\n"
-            "Develop arguments progressively across sections.\n"
+            "Synthesize existing studies and identify gaps.\n"
         ),
         "business plan": (
-            "Focus on execution strategy, market opportunity, and financial logic.\n"
-            "Write persuasively but realistically.\n"
+            "Focus on execution strategy and financial viability.\n"
         ),
         "market research report": (
-            "Present structured analysis and insights.\n"
-            "Interpret trends and data clearly.\n"
+            "Present structured data-driven insights.\n"
         ),
         "blog post": (
-            "Use conversational tone.\n"
-            "Maintain reader engagement and clarity.\n"
+            "Maintain conversational flow and engagement.\n"
         ),
         "email": (
             "Be concise and action-oriented.\n"
-            "Avoid unnecessary elaboration.\n"
         ),
-        "copywriting": (
-            "Write persuasively with clear value propositions.\n"
-            "Guide the reader toward action.\n"
-        ),
-        "ghostwriting": (
-            "Adopt a neutral, professional voice.\n"
-            "Avoid identifiable stylistic fingerprints.\n"
-        ),
-        "technical documentation": (
-            "Explain systems and processes step by step.\n"
-            "Use structured formatting and definitions.\n"
-        ),
-    }
+    }.get(writing_type.lower(), "")
 
-    return mapping.get(wt, "")
-
-
-# =========================
-# LONG-FORM INTELLIGENCE
-# =========================
 
 def long_form_intelligence(mode: str) -> str:
-    mapping = {
-        "single": (
-            "Produce a complete standalone work.\n"
-            "Ensure internal coherence.\n"
-        ),
+    return {
+        "single": "Produce a complete standalone work.\n",
         "chapters": (
             "This is part of a multi-chapter work.\n"
             "Do not conclude the entire work.\n"
-            "Maintain continuity for subsequent chapters.\n"
         ),
         "series": (
-            "This content is part of a series.\n"
+            "This is part of a series.\n"
             "Avoid final conclusions.\n"
-            "Create anticipation for the next part.\n"
         ),
-    }
+    }.get(mode, "")
 
-    return mapping.get(mode, "")
+
+# =========================
+# CITATION ENFORCEMENT (NEW - PHASE 1)
+# =========================
+
+def citation_intelligence(style: str, allow_old: bool) -> str:
+    """Enforce citation rules at prompt level."""
+    style_rules = {
+        "APA": (
+            "Use APA format (author, year) in-text citations.\n"
+            "Reference list must be alphabetical, hanging indent.\n"
+        ),
+        "Harvard": (
+            "Use Harvard format (author year) in-text citations.\n"
+            "Separate references by medium type.\n"
+        ),
+        "MLA": (
+            "Use MLA format (author page) in-text citations.\n"
+            "Works Cited list, alphabetical order.\n"
+        ),
+        "Chicago": (
+            "Use Chicago notes-bibliography format.\n"
+            "Footnotes with full citations first, shortened after.\n"
+        ),
+        "Vancouver": (
+            "Use Vancouver numbered citations [1], [2], etc.\n"
+            "Reference list in citation order.\n"
+        ),
+    }.get(style, "")
+
+    age_rule = (
+        "Use ONLY references from the last 5 years.\n"
+        if not allow_old
+        else "Older references may be used if highly relevant.\n"
+    )
+
+    anti_hallucination = (
+        "CRITICAL: Do NOT fabricate sources.\n"
+        "Only cite sources you are certain exist.\n"
+        "If unsure about a source, use conditional language: 'research suggests' instead of citing.\n"
+        "If a source cannot be verified, DO NOT include it.\n"
+    )
+
+    return f"{style_rules}{age_rule}{anti_hallucination}"
 
 
 # =========================
@@ -143,15 +142,17 @@ def build_outline_prompt(data: OutlineRequest) -> str:
         f"Writing category: {data.category.value}\n"
         f"Writing type: {data.writing_type}\n"
         f"Long-form mode: {data.long_form_mode.value}\n"
-        f"Citation style: {data.citation_style}\n"
-        f"{category_intelligence(data.category.value)}"
+        f"Citation style: {data.citation_style.value}\n"
+        f"\n{category_intelligence(data.category.value)}"
         f"{writing_type_intelligence(data.writing_type)}"
         f"{long_form_intelligence(data.long_form_mode.value)}"
-        f"{'Use references from the last 5 years only.\n' if not data.allow_old_citations else ''}"
-        f"{f'Education level: {data.education_level}\n' if data.education_level else ''}"
-        f"Topic: {data.topic}\n"
-        "Generate a structured outline.\n"
-        "Return only the outline.\n"
+        f"{citation_intelligence(data.citation_style.value, data.allow_old_citations)}"
+        f"\nEducation level: {data.education_level or 'Not specified'}\n"
+        f"\nTopic: {data.topic}\n"
+        "\n--- INSTRUCTION ---\n"
+        "Generate a detailed, structured outline.\n"
+        "Include point descriptions (2-3 sentences each).\n"
+        "Return ONLY the outline, no preamble.\n"
     )
 
 
@@ -163,41 +164,43 @@ def build_chapter_prompt(data: ChapterRequest) -> str:
         f"Writing type: {data.writing_type}\n"
         f"Long-form mode: {data.long_form_mode.value}\n"
         f"Chapter title: {data.chapter_title}\n"
-        f"Citation style: {data.citation_style}\n"
-        f"{category_intelligence(data.category.value)}"
+        f"Citation style: {data.citation_style.value}\n"
+        f"\n{category_intelligence(data.category.value)}"
         f"{writing_type_intelligence(data.writing_type)}"
         f"{long_form_intelligence(data.long_form_mode.value)}"
-        f"{'Use references from the last 5 years only.\n' if not data.allow_old_citations else ''}"
-        f"Target length: {data.word_count} words.\n"
-        "Outline points:\n"
-        f"{outline_block}\n"
-        "Do not summarize the entire work.\n"
+        f"{citation_intelligence(data.citation_style.value, data.allow_old_citations)}"
+        f"\nTarget length: ~{data.word_count} words.\n"
+        f"\nOutline points to cover:\n{outline_block}\n"
+        "\n--- INSTRUCTION ---\n"
+        "Write a deep, substantive chapter.\n"
+        "Do NOT summarize the entire work.\n"
+        "Do NOT write conclusions that end the overall piece.\n"
+        "Include inline citations where appropriate.\n"
+        "Return ONLY the chapter content, no metadata.\n"
     )
 
 
 # =========================
-# GENERATION FUNCTIONS
+# GENERATION
 # =========================
-
-def _safe_generate(prompt: str, config: GenerationConfig) -> str:
-    try:
-        response = model.generate_content(prompt, generation_config=config)
-        if not response or not response.text:
-            raise RuntimeError("Empty response from Gemini")
-        return response.text
-    except Exception as e:
-        raise RuntimeError(f"Gemini generation failed: {e}")
-
 
 def generate_outline(data: OutlineRequest) -> str:
-    return _safe_generate(
+    response = model.generate_content(
         build_outline_prompt(data),
-        GenerationConfig(temperature=0.4, max_output_tokens=4096),
+        generation_config=GenerationConfig(
+            temperature=0.3,  # Lower = more consistent structure
+            max_output_tokens=4096,
+        ),
     )
+    return response.text
 
 
 def generate_chapter(data: ChapterRequest) -> str:
-    return _safe_generate(
+    response = model.generate_content(
         build_chapter_prompt(data),
-        GenerationConfig(temperature=0.5, max_output_tokens=16384),
+        generation_config=GenerationConfig(
+            temperature=0.4,  # Slightly lower for academic credibility
+            max_output_tokens=16384,
+        ),
     )
+    return response.text

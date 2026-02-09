@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
-router = APIRouter(prefix="/api")
+api_router = APIRouter()
 
-@router.get("/status")
+@api_router.get("/status")
 async def status():
     return {
         "status": "ok",

@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class WritingCategory(str, Enum):
@@ -28,9 +28,9 @@ class LongFormMode(str, Enum):
 
 
 class OutlineRequest(BaseModel):
-    topic: str = Field(..., min_length=1)
+    topic: str
     category: WritingCategory
-    writing_type: str = Field(..., min_length=1)
+    writing_type: str
     citation_style: Optional[CitationStyle] = CitationStyle.apa
     education_level: Optional[str] = None
     long_form_mode: LongFormMode = LongFormMode.single
@@ -38,12 +38,12 @@ class OutlineRequest(BaseModel):
 
 
 class ChapterRequest(BaseModel):
-    topic: str = Field(..., min_length=1)
+    topic: str
     category: WritingCategory
-    writing_type: str = Field(..., min_length=1)
-    chapter_title: str = Field(..., min_length=1)
-    outline_points: List[str] = Field(..., min_items=1)
+    writing_type: str
+    chapter_title: str
+    outline_points: List[str]
     citation_style: Optional[CitationStyle] = CitationStyle.apa
-    word_count: int = Field(default=5000, ge=300)
+    word_count: int = 5000
     long_form_mode: LongFormMode = LongFormMode.chapters
     allow_old_citations: bool = False
