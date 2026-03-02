@@ -45,7 +45,7 @@ def test_valid_apa_citations():
 
 def test_detect_fake_citations():
     """Test hallucination detection."""
-    is_sus, reasons = check_hallucination_patterns(FAKE_CITATIONS_TEXT)
+    is_sus, reasons = check_hallucination_patterns(FAKE_CITATIONS_TEXT, "APA")
     print(f"✅ Hallucination detected: {is_sus}")
     print(f"   Reasons: {reasons}")
     assert is_sus

@@ -7,7 +7,7 @@ router = APIRouter(prefix="/writing", tags=["Writing"])
 
 
 @router.post("/outline")
-def create_outline(payload: OutlineRequest):
+def create_outline_endpoint(payload: OutlineRequest):
     try:
         return {
             "status": "success",
@@ -18,7 +18,7 @@ def create_outline(payload: OutlineRequest):
 
 
 @router.post("/chapter")
-def generate_chapter_content(payload: ChapterRequest):
+def create_chapter_endpoint(payload: ChapterRequest):
     try:
         return {
             "status": "success",

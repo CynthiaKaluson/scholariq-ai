@@ -1,4 +1,4 @@
-# Scholariq-AI 🎓
+# Scholariq-AI
 
 **AI-powered long-form writing engine for academic & professional content**
 
@@ -47,6 +47,15 @@ Most AI writing tools:
 - **Server**: Uvicorn
 
 ---
+
+## API Documentation
+
+Interactive Swagger UI available at:
+
+http://localhost:8000/docs
+
+![Swagger UI](docs/swagger.png)
+
 
 ## Quick Start
 

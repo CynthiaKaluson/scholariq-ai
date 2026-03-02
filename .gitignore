@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-.env
+../.env
 .venv/
 venv/
 
@@ -17,3 +17,4 @@ venv/
 # OS files
 .DS_Store
 Thumbs.db
+

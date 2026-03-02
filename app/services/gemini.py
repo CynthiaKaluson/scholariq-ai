@@ -6,7 +6,6 @@ from app.core.config import settings
 from app.models.schemas import OutlineRequest, ChapterRequest
 from app.services.citation_validator import validate_citations
 
-
 # =========================
 # GEMINI CLIENT SETUP
 # =========================
@@ -152,15 +151,17 @@ def citation_intelligence(style: str, allow_old: bool) -> str:
 
 def build_outline_prompt(data: OutlineRequest) -> str:
     """Build complete outline generation prompt."""
+    citation_style: str = data.citation_style.value  # type: ignore[assignment]
+
     return (
         f"Writing category: {data.category.value}\n"
         f"Writing type: {data.writing_type}\n"
         f"Long-form mode: {data.long_form_mode.value}\n"
-        f"Citation style: {data.citation_style.value}\n"
+        f"Citation style: {citation_style}\n"
         f"\n{category_intelligence(data.category.value)}"
         f"{writing_type_intelligence(data.writing_type)}"
         f"{long_form_intelligence(data.long_form_mode.value)}"
-        f"{citation_intelligence(data.citation_style.value, data.allow_old_citations)}"
+        f"{citation_intelligence(citation_style, data.allow_old_citations)}"
         f"\nEducation level: {data.education_level or 'Not specified'}\n"
         f"\nTopic: {data.topic}\n"
         "\n--- INSTRUCTION ---\n"
@@ -172,6 +173,7 @@ def build_outline_prompt(data: OutlineRequest) -> str:
 
 def build_chapter_prompt(data: ChapterRequest) -> str:
     """Build complete chapter generation prompt."""
+    citation_style: str = data.citation_style.value  # type: ignore[assignment]
     outline_block = "\n".join(f"- {p}" for p in data.outline_points)
 
     return (
@@ -179,11 +181,11 @@ def build_chapter_prompt(data: ChapterRequest) -> str:
         f"Writing type: {data.writing_type}\n"
         f"Long-form mode: {data.long_form_mode.value}\n"
         f"Chapter title: {data.chapter_title}\n"
-        f"Citation style: {data.citation_style.value}\n"
+        f"Citation style: {citation_style}\n"
         f"\n{category_intelligence(data.category.value)}"
         f"{writing_type_intelligence(data.writing_type)}"
         f"{long_form_intelligence(data.long_form_mode.value)}"
-        f"{citation_intelligence(data.citation_style.value, data.allow_old_citations)}"
+        f"{citation_intelligence(citation_style, data.allow_old_citations)}"
         f"\nTarget length: ~{data.word_count} words.\n"
         f"\nOutline points to cover:\n{outline_block}\n"
         "\n--- INSTRUCTION ---\n"
@@ -212,18 +214,19 @@ def generate_outline(data: OutlineRequest) -> str:
         outline_text = response.text
 
         # Validate citations in outline
+        citation_style: str = data.citation_style.value  # type: ignore[assignment]
         report = validate_citations(
             outline_text,
-            data.citation_style.value,
+            citation_style,
             data.allow_old_citations
         )
 
         # If high hallucination risk, warn user
-        if report.hallucination_score > 0.5:
+        if report.hallucination_score > 0.3:
             outline_text += (
-                f"\n\n⚠️ HIGH HALLUCINATION RISK in citations "
-                f"({report.hallucination_score:.0%}). "
-                f"Review references carefully.\n"
+                f"\n\n⚠️ CITATION WARNING\n"
+                f"Hallucination Score: {report.hallucination_score:.0%}\n"
+                f"Review citations carefully before use.\n"
             )
 
         return outline_text
@@ -244,9 +247,10 @@ def generate_chapter(data: ChapterRequest) -> str:
         chapter_text = response.text
 
         # Validate citations in chapter
+        citation_style: str = data.citation_style.value  # type: ignore[assignment]
         report = validate_citations(
             chapter_text,
-            data.citation_style.value,
+            citation_style,
             data.allow_old_citations
         )
 
