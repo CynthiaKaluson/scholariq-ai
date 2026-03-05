@@ -1,73 +1,253 @@
 # Scholariq-AI
 
-**AI-powered long-form writing engine for academic & professional content**
+Scholariq-AI is a backend API that generates structured long-form academic and professional content using Large Language Models, while actively checking citations for possible hallucinations.
 
-A backend API that generates **credible, structured, citation-aware written content** using Google Gemini 3 models—with built-in hallucination detection and citation validation.
+The project was built after noticing a recurring issue with many AI writing tools: they generate impressive text, but frequently invent references, ignore citation standards, or produce poorly structured long-form writing.
 
----
-
-## Problem
-
-Most AI writing tools:
-- ❌ Hallucinate fake references
-- ❌ Ignore academic structure
-- ❌ Don't respect citation standards
-- ❌ Produce shallow long-form outputs
-
-**Scholariq-AI solves this.**
+Scholariq-AI attempts to solve that problem by combining AI generation with a validation layer that checks citations and flags suspicious references.
 
 ---
 
-## Features
+# The Problem
 
-✅ **Writing Intelligence**
-- 7 writing categories (academic, professional, business, technical, etc.)
-- Multiple writing types (research paper, thesis, blog post, email, etc.)
-- Long-form modes (single, chapters, series)
+Many AI writing systems today are excellent at producing fluent text, but they struggle with academic reliability.
 
-✅ **Citation Enforcement**
-- APA, Harvard, MLA, Chicago, Vancouver formats
-- Anti-hallucination detection (8+ pattern recognition)
-- Citation age validation (default: last 5 years)
-- Hallucination scoring (0-100%)
+Common issues include:
 
-✅ **Production-Ready**
-- FastAPI backend
-- Gemini-3 integration (pro & flash models)
-- Structured prompt engineering
-- Pydantic validation
+• Fake or non-existent citations  
+• Broken citation formatting  
+• Poorly structured research writing  
+• Lack of transparency about source reliability  
+
+For students, researchers, and professionals, this makes AI output difficult to trust.
+
+Scholariq-AI introduces an additional validation layer that analyzes citations and highlights possible hallucinations.
 
 ---
 
-## Stack
+# What Scholariq-AI Does
 
-- **Backend**: Python 3.11 + FastAPI
-- **AI Model**: Google Gemini-3 (pro-preview, flash-preview)
-- **Validation**: Pydantic v2
-- **Server**: Uvicorn
+The API focuses on three major capabilities.
+
+## 1. Structured Writing Generation
+
+The system supports multiple writing contexts such as:
+
+• Academic papers  
+• Research chapters  
+• Technical documentation  
+• Professional reports  
+• Blog content  
+
+It also supports different **long-form generation modes**:
+
+• Single document  
+• Chapter-based writing  
+• Multi-part series
+
+This helps maintain structure across longer documents instead of generating disconnected paragraphs.
 
 ---
 
-## API Documentation
+## 2. Citation Validation Layer
 
-Interactive Swagger UI available at:
+After the AI generates text, the system analyzes citations and checks them for possible hallucinations.
+
+Supported citation styles include:
+
+• APA  
+• Harvard  
+• MLA  
+• Chicago  
+• Vancouver
+
+The validator looks for suspicious patterns such as:
+
+• Placeholder author names  
+• Fake publishers  
+• Impossible publication years  
+• Repeated fabricated sources  
+• Citation formatting errors  
+
+Each result produces a **hallucination score** that indicates how trustworthy the references appear.
+
+---
+
+## 3. Clean API Architecture
+
+Scholariq-AI was built as a modular backend service using FastAPI.
+
+The system is designed so that generation logic, validation logic, and API routing are separated into independent components.
+
+This makes the project easier to test, maintain, and extend.
+
+---
+
+# Technical Stack
+
+Backend Framework  
+FastAPI
+
+Language  
+Python 3.11
+
+AI Integration  
+Google Gemini API
+
+Validation  
+Pydantic v2
+
+Server  
+Uvicorn
+
+Environment Management  
+python-dotenv
+
+---
+
+# Project Structure
+
+
+scholariq-ai/
+│
+├── app/
+│ ├── main.py
+│ ├── routes/
+│ ├── services/
+│ ├── models/
+│ ├── tests/
+│ └── core/
+│
+├── docs/
+│ └── swagger.png
+│
+├── requirements.txt
+├── .env.example
+├── Dockerfile
+├── README.md
+└── .gitignore
+
+
+The architecture separates responsibilities clearly:
+
+• `routes/` handles API endpoints  
+• `services/` contains AI and validation logic  
+• `models/` defines request/response schemas  
+• `tests/` contains validation tests  
+
+---
+
+# Running the Project Locally
+
+Clone the repository.
+
+
+git clone https://github.com/CynthiaKaluson/scholariq-ai.git
+
+cd scholariq-ai
+
+
+Create a virtual environment.
+
+
+python -m venv venv
+
+
+Activate the environment.
+
+Linux / Mac
+
+
+source venv/bin/activate
+
+
+Windows
+
+
+venv\Scripts\activate
+
+
+Install dependencies.
+
+
+pip install -r requirements.txt
+
+
+Start the server.
+
+
+uvicorn main:app --reload
+
+
+The API will be available at:
+
+
+http://localhost:8000
+
+
+---
+
+# API Documentation
+
+FastAPI automatically generates interactive API documentation.
+
+Once the server is running, open:
+
 
 http://localhost:8000/docs
 
+
+This Swagger interface allows you to test endpoints directly from the browser.
+
 ![Swagger UI](docs/swagger.png)
 
+---
 
-## Quick Start
+# Environment Variables
 
-### 1. Clone & Setup
+Create a `.env` file in the project root.
 
-```bash
-git clone https://github.com/CynthiaKaluson/scholariq-ai.git
-cd scholariq-ai
+Example:
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+GEMINI_API_KEY=your_api_key_here
+GEMINI_MODEL=gemini-3-flash-preview
+
+
+The `.env` file should **never be committed to GitHub**.
+
+Use `.env.example` to document required variables.
+
+---
+
+# Deployment
+
+The project is configured for cloud deployment.
+
+Example start command used for platforms like Render:
+
+
+uvicorn main:app --host 0.0.0.0 --port 10000
+
+
+Environment variables should be configured in the hosting platform dashboard.
+
+---
+
+# Why This Project Matters
+
+Large language models are powerful writing tools, but reliability remains a challenge.
+
+Scholariq-AI explores a practical approach:
+
+AI generation combined with post-generation validation.
+
+Instead of blindly trusting generated text, the system analyzes citations and highlights potential issues before the content is used.
+
+---
+
+# Author
+
+Cynthia Kalu Okorie
+
+Backend developer focused on AI systems, backend engineering, and intelligent APIs.
