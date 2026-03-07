@@ -59,6 +59,10 @@ def writing_type_intelligence(writing_type: str) -> str:
         "research paper": (
             "Include abstract, methodology, results, and discussion.\n"
         ),
+        "research_explanation": (
+            "Structure the work as a research explanation.\n"
+            "Explain the topic clearly while grounding arguments in research.\n"
+        ),
         "literature review": (
             "Synthesize existing studies and identify gaps.\n"
         ),
