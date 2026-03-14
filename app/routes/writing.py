@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
+from fastapi import Request
+from app.core.limiter import limiter
+
 from app.models.schemas import (
     OutlineRequest,
     ChapterRequest,
@@ -20,7 +23,9 @@ class QuickGenerateRequest(BaseModel):
 
 
 @router.post("/quick-generate")
+@limiter.limit("10/minute")
 def quick_generate(
+    request: Request,
     data: QuickGenerateRequest,
     _: str = Depends(verify_api_key),
 ):
@@ -51,7 +56,9 @@ def quick_generate(
 
 
 @router.post("/outline")
+@limiter.limit("5/minute")
 def create_outline_endpoint(
+    request: Request,
     payload: OutlineRequest,
     _: str = Depends(verify_api_key),
 ):
@@ -66,7 +73,9 @@ def create_outline_endpoint(
 
 
 @router.post("/chapter")
+@limiter.limit("5/minute")
 def create_chapter_endpoint(
+    request: Request,
     payload: ChapterRequest,
     _: str = Depends(verify_api_key),
 ):
