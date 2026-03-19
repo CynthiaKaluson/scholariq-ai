@@ -1,4 +1,6 @@
 from google import genai
+from google.genai.types import GenerateContentConfig
+from fastapi import HTTPException
 
 from app.core.config import settings
 from app.models.schemas import OutlineRequest, ChapterRequest
@@ -202,75 +204,89 @@ def build_chapter_prompt(data: ChapterRequest) -> str:
 
 def generate_outline(data: OutlineRequest) -> str:
     """Generate outline and validate citations."""
-    try:
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=build_outline_prompt(data),
-            config={
-                "temperature": 0.3,
-                "max_output_tokens": 4096,
-            },
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=build_outline_prompt(data),
+        config=GenerateContentConfig(
+            temperature=0.3,
+            max_output_tokens=4096,
+        ),
+    )
+
+    outline_text = response.text if hasattr(response, "text") else ""
+
+    citation_style: str = data.citation_style.value  # type: ignore[assignment]
+    report = validate_citations(
+        outline_text,
+        citation_style,
+        data.allow_old_citations
+    )
+
+    if report.hallucination_score > 0.3:
+        outline_text += (
+            f"\n\n⚠️ CITATION WARNING\n"
+            f"Hallucination Score: {report.hallucination_score:.0%}\n"
+            f"Review citations carefully before use.\n"
         )
-        outline_text = response.text if hasattr(response, "text") else ""
 
-        # Validate citations in outline
-        citation_style: str = data.citation_style.value  # type: ignore[assignment]
-        report = validate_citations(
-            outline_text,
-            citation_style,
-            data.allow_old_citations
-        )
-
-        # If high hallucination risk, warn user
-        if report.hallucination_score > 0.3:
-            outline_text += (
-                f"\n\n⚠️ CITATION WARNING\n"
-                f"Hallucination Score: {report.hallucination_score:.0%}\n"
-                f"Review citations carefully before use.\n"
-            )
-
-        return outline_text
-    except Exception as e:
-        return f"ERROR generating outline: {str(e)}"
+    return outline_text
 
 
 def generate_chapter(data: ChapterRequest) -> str:
     """Generate chapter and validate citations."""
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=build_chapter_prompt(data),
+        config=GenerateContentConfig(
+            temperature=0.4,
+            max_output_tokens=16384,
+        ),
+    )
+
+    chapter_text = response.text if hasattr(response, "text") else ""
+
+    citation_style: str = data.citation_style.value  # type: ignore[assignment]
+    report = validate_citations(
+        chapter_text,
+        citation_style,
+        data.allow_old_citations
+    )
+
+    if report.suspicious_citations > 0:
+        chapter_text += (
+            f"\n\n📋 CITATION VALIDATION REPORT\n"
+            f"Total Citations: {report.total_citations}\n"
+            f"Valid: {report.valid_citations}\n"
+            f"Suspicious: {report.suspicious_citations}\n"
+            f"Hallucination Score: {report.hallucination_score:.0%}\n"
+        )
+
+        if report.issues:
+            chapter_text += "Issues:\n" + "\n".join(f"  • {issue}" for issue in report.issues) + "\n"
+
+        if report.recommendations:
+            chapter_text += "Recommendations:\n" + "\n".join(f"  • {rec}" for rec in report.recommendations) + "\n"
+
+    return chapter_text
+
+
+# =========================
+# STREAMING
+# =========================
+
+def stream_chapter(data: ChapterRequest):
+    """Stream chapter generation token by token."""
     try:
-        response = client.models.generate_content(
+        stream = client.models.generate_content_stream(
             model=MODEL_NAME,
             contents=build_chapter_prompt(data),
-            config={
-                "temperature": 0.4,
-                "max_output_tokens": 16384,
-            },
+            config=GenerateContentConfig(
+                temperature=0.4,
+                max_output_tokens=16384,
+            ),
         )
-        chapter_text = response.text if hasattr(response, "text") else ""
-
-        # Validate citations in chapter
-        citation_style: str = data.citation_style.value  # type: ignore[assignment]
-        report = validate_citations(
-            chapter_text,
-            citation_style,
-            data.allow_old_citations
-        )
-
-        # Append validation report to output
-        if report.suspicious_citations > 0:
-            chapter_text += (
-                f"\n\n📋 CITATION VALIDATION REPORT\n"
-                f"Total Citations: {report.total_citations}\n"
-                f"Valid: {report.valid_citations}\n"
-                f"Suspicious: {report.suspicious_citations}\n"
-                f"Hallucination Score: {report.hallucination_score:.0%}\n"
-            )
-
-            if report.issues:
-                chapter_text += "Issues:\n" + "\n".join(f"  • {issue}" for issue in report.issues) + "\n"
-
-            if report.recommendations:
-                chapter_text += "Recommendations:\n" + "\n".join(f"  • {rec}" for rec in report.recommendations) + "\n"
-
-        return chapter_text
+        for chunk in stream:
+            if chunk.text:
+                yield chunk.text
     except Exception as e:
-        return f"ERROR generating chapter: {str(e)}"
+        raise HTTPException(status_code=500, detail=f"Streaming failed: {str(e)}")
