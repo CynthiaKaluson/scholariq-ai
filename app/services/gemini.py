@@ -1,6 +1,4 @@
-# noinspection PyTypeChecker
-from google.generativeai import GenerativeModel, configure
-from google.generativeai.types import GenerationConfig
+from google import genai
 
 from app.core.config import settings
 from app.models.schemas import OutlineRequest, ChapterRequest
@@ -10,12 +8,9 @@ from app.services.citation_validator import validate_citations
 # GEMINI CLIENT SETUP
 # =========================
 
-configure(api_key=settings.GEMINI_API_KEY)
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
-# ✅ CORRECT: Just the model name
-model = GenerativeModel(
-    model_name="gemini-3-flash-preview"
-)
+MODEL_NAME = settings.GEMINI_MODEL
 
 
 # =========================
@@ -208,14 +203,15 @@ def build_chapter_prompt(data: ChapterRequest) -> str:
 def generate_outline(data: OutlineRequest) -> str:
     """Generate outline and validate citations."""
     try:
-        response = model.generate_content(
-            build_outline_prompt(data),
-            generation_config=GenerationConfig(
-                temperature=0.3,
-                max_output_tokens=4096,
-            ),
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=build_outline_prompt(data),
+            config={
+                "temperature": 0.3,
+                "max_output_tokens": 4096,
+            },
         )
-        outline_text = response.text
+        outline_text = response.text if hasattr(response, "text") else ""
 
         # Validate citations in outline
         citation_style: str = data.citation_style.value  # type: ignore[assignment]
@@ -241,14 +237,15 @@ def generate_outline(data: OutlineRequest) -> str:
 def generate_chapter(data: ChapterRequest) -> str:
     """Generate chapter and validate citations."""
     try:
-        response = model.generate_content(
-            build_chapter_prompt(data),
-            generation_config=GenerationConfig(
-                temperature=0.4,
-                max_output_tokens=16384,
-            ),
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=build_chapter_prompt(data),
+            config={
+                "temperature": 0.4,
+                "max_output_tokens": 16384,
+            },
         )
-        chapter_text = response.text
+        chapter_text = response.text if hasattr(response, "text") else ""
 
         # Validate citations in chapter
         citation_style: str = data.citation_style.value  # type: ignore[assignment]

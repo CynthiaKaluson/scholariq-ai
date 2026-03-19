@@ -47,11 +47,12 @@ Scholariq-AI introduces a validation layer that analyzes citations and flags sus
 
 ## Live API
 ```
-https://your-render-url.onrender.com
+https://scholariq-ai.onrender.com/
 ```
+
 Interactive documentation:
 ```
-https://your-render-url.onrender.com/docs
+https://scholariq-ai.onrender.com/docs
 ```
 ---
 ## Quick API Demo
@@ -97,6 +98,13 @@ Docker
 Deployment Platform
 Render
 ```
+### Database Note
+```
+ScholarIQ is a stateless generation API. Each request is processed and a response returned — there is no user data, session state, or content history to persist.
+SQLite is used exclusively for rate limiting state (via SlowAPI). This is a deliberate, scoped choice: rate limiting requires only lightweight in-process counters, not a networked database. SQLite is appropriate for this use case.
+A PostgreSQL version with user account management, generation history, and API key dashboards is planned as the next architectural phase.
+```
+
 ---
 
 ## Project Structure
