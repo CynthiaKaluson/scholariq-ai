@@ -1,90 +1,89 @@
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+import uuid
+import json
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-from fastapi import Request
+from app.db.session import get_db
+from app.core.security import verify_api_key
 from app.core.limiter import limiter
-
-from app.models.schemas import (
-    OutlineRequest,
-    ChapterRequest,
-    WritingCategory,
-    CitationStyle,
-    LongFormMode,
-)
-
-from app.services.gemini import generate_outline, generate_chapter
-from app.core.auth import verify_api_key
+from app.models.database import Generation, User
+from app.models.schemas import WritingRequest, WritingResponse, GenerationListResponse, SourceReference
+from app.services.retrieval import retrieve_relevant_chunks
+from app.services.generation import generate_content
+from app.routes.documents import get_or_create_user
+from fastapi import Request
 
 router = APIRouter(prefix="/writing", tags=["Writing"])
 
 
-class QuickGenerateRequest(BaseModel):
-    topic: str
-
-
-@router.post("/quick-generate")
-@limiter.limit("10/minute")
-def quick_generate(
-    request: Request,
-    data: QuickGenerateRequest,
-    _: str = Depends(verify_api_key),
-):
-    """
-    Simplified endpoint that only requires a topic.
-    The backend fills the rest with default parameters automatically.
-    """
-
-    try:
-        payload = OutlineRequest(
-            topic=data.topic,
-            category=WritingCategory.academic,
-            writing_type="research_explanation",
-            citation_style=CitationStyle.apa,
-            education_level="undergraduate",
-            long_form_mode=LongFormMode.single,
-            allow_old_citations=False,
-        )
-
-        return {
-            "status": "success",
-            "topic": data.topic,
-            "outline": generate_outline(payload),
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/outline")
+@router.post("/generate", response_model=WritingResponse)
 @limiter.limit("5/minute")
-def create_outline_endpoint(
+async def generate_writing(
     request: Request,
-    payload: OutlineRequest,
-    _: str = Depends(verify_api_key),
+    payload: WritingRequest,
+    db: AsyncSession = Depends(get_db),
+    api_key: str = Depends(verify_api_key),
 ):
-    try:
-        return {
-            "status": "success",
-            "outline": generate_outline(payload),
-        }
+    user = await get_or_create_user(api_key, db)
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    chunks = await retrieve_relevant_chunks(
+        db=db,
+        query=payload.topic,
+        user_id=user.id,
+    )
+
+    content, sources_used = await generate_content(
+        topic=payload.topic,
+        writing_type=payload.writing_type,
+        word_count=payload.word_count,
+        chunks=chunks,
+    )
+
+    generation = Generation(
+        user_id=user.id,
+        topic=payload.topic,
+        writing_type=payload.writing_type,
+        content=content,
+        sources_used=json.dumps(sources_used),
+    )
+    db.add(generation)
+    await db.commit()
+    await db.refresh(generation)
+
+    return WritingResponse(
+        id=generation.id,
+        topic=generation.topic,
+        writing_type=generation.writing_type,
+        content=generation.content,
+        sources=[SourceReference(**s) for s in sources_used],
+        created_at=generation.created_at,
+    )
 
 
-@router.post("/chapter")
-@limiter.limit("5/minute")
-def create_chapter_endpoint(
-    request: Request,
-    payload: ChapterRequest,
-    _: str = Depends(verify_api_key),
+@router.get("/history", response_model=GenerationListResponse)
+async def get_history(
+    db: AsyncSession = Depends(get_db),
+    api_key: str = Depends(verify_api_key),
 ):
-    try:
-        return {
-            "status": "success",
-            "chapter_title": payload.chapter_title,
-            "content": generate_chapter(payload),
-        }
+    user = await get_or_create_user(api_key, db)
+    result = await db.execute(
+        select(Generation)
+        .where(Generation.user_id == user.id)
+        .order_by(Generation.created_at.desc())
+    )
+    generations = result.scalars().all()
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    items = []
+    for g in generations:
+        sources = json.loads(g.sources_used) if g.sources_used else []
+        items.append(WritingResponse(
+            id=g.id,
+            topic=g.topic,
+            writing_type=g.writing_type,
+            content=g.content,
+            sources=[SourceReference(**s) for s in sources],
+            created_at=g.created_at,
+        ))
+
+    return GenerationListResponse(generations=items, total=len(items))

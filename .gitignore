@@ -1,22 +1,9 @@
-# Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-../.env
+.env
 .venv/
 venv/
-env
-.env
-
-
-# FastAPI / Uvicorn
-*.log
-
-# PyCharm / IntelliJ
+env/
 .idea/
-*.iml
-
-# OS files
 .DS_Store
-Thumbs.db
+*.log

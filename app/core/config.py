@@ -2,13 +2,13 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    app_name: str = "Scholariq-AI"
-    GEMINI_API_KEY: str
-    GEMINI_MODEL: str = "gemini-3-flash-preview"
+    app_name: str = "ScholarIQ"
+    database_url: str
+    openai_api_key: str
+    api_secret_key: str
 
     class Config:
         env_file = ".env"
-        extra = "allow"
 
 
 settings = Settings()

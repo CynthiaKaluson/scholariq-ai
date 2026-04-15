@@ -1,49 +1,54 @@
-from enum import Enum
-from typing import List, Optional
+import uuid
+from datetime import datetime
 from pydantic import BaseModel
 
 
-class WritingCategory(str, Enum):
-    academic = "academic"
-    professional = "professional"
-    business = "business"
-    content_marketing = "content_marketing"
-    personal_admin = "personal_admin"
-    technical = "technical"
-    specialized = "specialized"
+# =========================
+# DOCUMENT SCHEMAS
+# =========================
+
+class DocumentResponse(BaseModel):
+    id: uuid.UUID
+    filename: str
+    is_public: bool
+    chunk_count: int
+    upload_date: datetime
+
+    model_config = {"from_attributes": True}
 
 
-class CitationStyle(str, Enum):
-    apa = "APA"
-    harvard = "Harvard"
-    mla = "MLA"
-    chicago = "Chicago"
-    vancouver = "Vancouver"
+class DocumentListResponse(BaseModel):
+    documents: list[DocumentResponse]
+    total: int
 
 
-class LongFormMode(str, Enum):
-    single = "single"
-    chapters = "chapters"
-    series = "series"
+# =========================
+# WRITING SCHEMAS
+# =========================
 
-
-class OutlineRequest(BaseModel):
+class WritingRequest(BaseModel):
     topic: str
-    category: WritingCategory
     writing_type: str
-    citation_style: Optional[CitationStyle] = CitationStyle.apa
-    education_level: Optional[str] = None
-    long_form_mode: LongFormMode = LongFormMode.single
-    allow_old_citations: bool = False
+    word_count: int = 500
 
 
-class ChapterRequest(BaseModel):
+class SourceReference(BaseModel):
+    document_name: str
+    page_number: int
+    excerpt: str
+
+
+class WritingResponse(BaseModel):
+    id: uuid.UUID
     topic: str
-    category: WritingCategory
     writing_type: str
-    chapter_title: str
-    outline_points: List[str]
-    citation_style: Optional[CitationStyle] = CitationStyle.apa
-    word_count: int = 5000
-    long_form_mode: LongFormMode = LongFormMode.chapters
-    allow_old_citations: bool = False
+    content: str
+    sources: list[SourceReference]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class GenerationListResponse(BaseModel):
+    generations: list[WritingResponse]
+    total: int
